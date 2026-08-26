@@ -27,7 +27,21 @@ type Analysis = {
   frame_times: number[];
 };
 type Correction = { frame_index: number; landmark_index: number; x: number; y: number };
+type SlowMotionSpeed = 0.5 | 0.25 | 0.125;
+type SlowMotionSegment = {
+  id: number;
+  start_frame: number;
+  end_frame: number;
+  speed: SlowMotionSpeed;
+};
+type SlowMotionDraft = Pick<SlowMotionSegment, "start_frame" | "end_frame">;
 type DragState = { landmarkIndex: number; pointerId: number };
+type TimelineDragState = {
+  pointerId: number;
+  mode: "scrub" | "create" | "resize-start" | "resize-end";
+  segmentId?: number;
+  anchorFrame: number;
+};
 type ToastState = {
   id: number;
   type: ToastType;
@@ -44,6 +58,8 @@ type FrameCallbackVideo = HTMLVideoElement & {
 };
 
 const WORKFLOW_STEPS = ["Cargar y analizar", "Revisar y ajustar", "Generar MP4"];
+const MIN_PORTRAIT_VIEWER_ASPECT_RATIO = 0.9;
+const SLOW_MOTION_SPEEDS: SlowMotionSpeed[] = [0.5, 0.25, 0.125];
 
 function formatFileSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -66,6 +82,12 @@ function frameFromTime(time: number, analysis: Analysis): number {
     else high = middle - 1;
   }
   return Math.min(analysis.metadata.frame_count - 1, Math.max(0, high));
+}
+
+function playbackSpeedForFrame(frameIndex: number, segments: SlowMotionSegment[]): number {
+  return segments.find((segment) => (
+    frameIndex >= segment.start_frame && frameIndex <= segment.end_frame
+  ))?.speed ?? 1;
 }
 
 function mediaViewport(
@@ -127,6 +149,10 @@ export default function App() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [corrections, setCorrections] = useState<Record<string, Correction>>({});
+  const [slowMotionSegments, setSlowMotionSegments] = useState<SlowMotionSegment[]>([]);
+  const [slowMotionDraft, setSlowMotionDraft] = useState<SlowMotionDraft | null>(null);
+  const [selectedSlowMotionId, setSelectedSlowMotionId] = useState<number | null>(null);
+  const [isSlowMotionMode, setIsSlowMotionMode] = useState(false);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [selectedLandmark, setSelectedLandmark] = useState<number | null>(null);
   const [requestState, setRequestState] = useState<RequestState>("idle");
@@ -142,15 +168,20 @@ export default function App() {
   const stageRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
   const correctionsRef = useRef(corrections);
   const analysisRef = useRef(analysis);
   const drawOverlayRef = useRef<(frameIndex: number) => void>(() => undefined);
   const dragRef = useRef<DragState | null>(null);
+  const timelineDragRef = useRef<TimelineDragState | null>(null);
   const currentFrameRef = useRef(currentFrame);
+  const slowMotionRef = useRef(slowMotionSegments);
+  const slowMotionIdRef = useRef(0);
 
   correctionsRef.current = corrections;
   analysisRef.current = analysis;
   currentFrameRef.current = currentFrame;
+  slowMotionRef.current = slowMotionSegments;
 
   useEffect(() => () => {
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
@@ -174,11 +205,12 @@ export default function App() {
     }
 
     const resizeStage = () => {
-      const aspectRatio = analysis.metadata.width / analysis.metadata.height;
+      const videoAspectRatio = analysis.metadata.width / analysis.metadata.height;
+      const viewerAspectRatio = Math.max(videoAspectRatio, MIN_PORTRAIT_VIEWER_ASPECT_RATIO);
       const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
       const maxHeight = Math.max(180, viewportHeight - 105);
-      const width = Math.min(workspace.clientWidth, maxHeight * aspectRatio);
-      setStageSize({ width: Math.round(width), height: Math.round(width / aspectRatio) });
+      const height = Math.min(maxHeight, workspace.clientWidth / viewerAspectRatio);
+      setStageSize({ width: Math.round(height * viewerAspectRatio), height: Math.round(height) });
     };
 
     resizeStage();
@@ -255,6 +287,7 @@ export default function App() {
     const frameVideo = video as FrameCallbackVideo;
     const paint = (mediaTime: number) => {
       const nextFrame = frameFromTime(mediaTime, analysis);
+      video.playbackRate = playbackSpeedForFrame(nextFrame, slowMotionRef.current);
       currentFrameRef.current = nextFrame;
       setCurrentFrame((previous) => (previous === nextFrame ? previous : nextFrame));
       drawOverlayRef.current(nextFrame);
@@ -297,6 +330,11 @@ export default function App() {
     drawOverlay(currentFrame);
   }, [analysis, corrections, currentFrame, selectedLandmark, stageSize, isFullscreen]);
 
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video) video.playbackRate = playbackSpeedForFrame(currentFrame, slowMotionSegments);
+  }, [currentFrame, slowMotionSegments]);
+
   function closeToast() {
     setToast((currentToast) => {
       currentToast?.onClose?.();
@@ -315,6 +353,10 @@ export default function App() {
     setResultUrl(null);
     setAnalysis(null);
     setCorrections({});
+    setSlowMotionSegments([]);
+    setSlowMotionDraft(null);
+    setSelectedSlowMotionId(null);
+    setIsSlowMotionMode(false);
     setCurrentFrame(0);
     setSelectedLandmark(null);
     setStageSize(null);
@@ -366,6 +408,10 @@ export default function App() {
       const nextAnalysis = (await response.json()) as Analysis;
       setAnalysis(nextAnalysis);
       setCorrections({});
+      setSlowMotionSegments([]);
+      setSlowMotionDraft(null);
+      setSelectedSlowMotionId(null);
+      setIsSlowMotionMode(false);
       setCurrentFrame(0);
       setRequestState("editing");
       setViewedStep(2);
@@ -407,8 +453,148 @@ export default function App() {
     video.pause();
     currentFrameRef.current = frame;
     setCurrentFrame(frame);
+    video.playbackRate = playbackSpeedForFrame(frame, slowMotionRef.current);
     // Use the source timestamps so manual stepping matches variable-frame-rate video too.
     video.currentTime = analysis.frame_times[frame] ?? frame / analysis.metadata.fps;
+  }
+
+  function timelineFrameFromPointer(event: PointerEvent<HTMLDivElement>): number | null {
+    if (!analysis || !timelineRef.current) return null;
+    const bounds = timelineRef.current.getBoundingClientRect();
+    if (!bounds.width) return null;
+    const progress = clamp((event.clientX - bounds.left) / bounds.width);
+    return Math.round(progress * (analysis.metadata.frame_count - 1));
+  }
+
+  function availableRange(anchorFrame: number, excludingId?: number): { start: number; end: number } {
+    if (!analysis) return { start: 0, end: 0 };
+    const segments = slowMotionSegments
+      .filter((segment) => segment.id !== excludingId)
+      .sort((first, second) => first.start_frame - second.start_frame);
+    const previous = [...segments].reverse().find((segment) => segment.end_frame < anchorFrame);
+    const next = segments.find((segment) => segment.start_frame > anchorFrame);
+    return {
+      start: previous ? previous.end_frame + 1 : 0,
+      end: next ? next.start_frame - 1 : analysis.metadata.frame_count - 1,
+    };
+  }
+
+  function startTimelineDrag(event: PointerEvent<HTMLDivElement>) {
+    const frame = timelineFrameFromPointer(event);
+    if (frame === null) return;
+    const target = event.target as HTMLElement;
+    const handle = target.closest<HTMLElement>("[data-segment-handle]");
+    const segmentElement = target.closest<HTMLElement>("[data-segment-id]");
+
+    if (!isSlowMotionMode) {
+      timelineDragRef.current = { pointerId: event.pointerId, mode: "scrub", anchorFrame: frame };
+      goToFrame(frame);
+      event.currentTarget.setPointerCapture(event.pointerId);
+      return;
+    }
+
+    if (handle && segmentElement) {
+      const segmentId = Number(segmentElement.dataset.segmentId);
+      const mode = handle.dataset.segmentHandle === "start" ? "resize-start" : "resize-end";
+      timelineDragRef.current = { pointerId: event.pointerId, mode, segmentId, anchorFrame: frame };
+      setSelectedSlowMotionId(segmentId);
+      event.currentTarget.setPointerCapture(event.pointerId);
+      return;
+    }
+    if (segmentElement) {
+      const segmentId = Number(segmentElement.dataset.segmentId);
+      setSelectedSlowMotionId(segmentId);
+      goToFrame(frame);
+      return;
+    }
+
+    const available = availableRange(frame);
+    if (frame < available.start || frame > available.end) return;
+    timelineDragRef.current = { pointerId: event.pointerId, mode: "create", anchorFrame: frame };
+    setSelectedSlowMotionId(null);
+    setSlowMotionDraft({ start_frame: frame, end_frame: frame });
+    goToFrame(frame);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function updateTimelineDrag(event: PointerEvent<HTMLDivElement>) {
+    const drag = timelineDragRef.current;
+    const frame = timelineFrameFromPointer(event);
+    if (!drag || frame === null || !analysis) return;
+
+    if (drag.mode === "scrub") {
+      goToFrame(frame);
+      return;
+    }
+
+    if (drag.mode === "create") {
+      const available = availableRange(drag.anchorFrame);
+      const endFrame = Math.min(available.end, Math.max(available.start, frame));
+      setSlowMotionDraft({
+        start_frame: Math.min(drag.anchorFrame, endFrame),
+        end_frame: Math.max(drag.anchorFrame, endFrame),
+      });
+      goToFrame(endFrame);
+      return;
+    }
+
+    setSlowMotionSegments((segments) => segments.map((segment) => {
+      if (segment.id !== drag.segmentId) return segment;
+      const available = availableRange(
+        drag.mode === "resize-start" ? segment.end_frame : segment.start_frame,
+        segment.id,
+      );
+      if (drag.mode === "resize-start") {
+        const start = Math.min(segment.end_frame - 1, Math.max(available.start, frame));
+        return { ...segment, start_frame: start };
+      }
+      const end = Math.max(segment.start_frame + 1, Math.min(available.end, frame));
+      return { ...segment, end_frame: end };
+    }));
+  }
+
+  function stopTimelineDrag(event: PointerEvent<HTMLDivElement>) {
+    const drag = timelineDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    timelineDragRef.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    if (drag.mode === "create") {
+      setSlowMotionDraft((draft) => (
+        draft && draft.end_frame > draft.start_frame ? draft : null
+      ));
+    }
+  }
+
+  function addSlowMotionSegment(speed: SlowMotionSpeed) {
+    if (!slowMotionDraft) return;
+    slowMotionIdRef.current += 1;
+    const segment = { ...slowMotionDraft, speed, id: slowMotionIdRef.current };
+    setSlowMotionSegments((segments) => [...segments, segment].sort(
+      (first, second) => first.start_frame - second.start_frame,
+    ));
+    setSelectedSlowMotionId(segment.id);
+    setSlowMotionDraft(null);
+  }
+
+  function updateSelectedSlowMotionSpeed(speed: SlowMotionSpeed) {
+    if (selectedSlowMotionId === null) return;
+    setSlowMotionSegments((segments) => segments.map((segment) => (
+      segment.id === selectedSlowMotionId ? { ...segment, speed } : segment
+    )));
+  }
+
+  function removeSelectedSlowMotionSegment() {
+    if (selectedSlowMotionId === null) return;
+    setSlowMotionSegments((segments) => segments.filter((segment) => segment.id !== selectedSlowMotionId));
+    setSelectedSlowMotionId(null);
+  }
+
+  function toggleSlowMotionMode() {
+    if (isSlowMotionMode) {
+      setSlowMotionDraft(null);
+      setSelectedSlowMotionId(null);
+    }
+    setIsSlowMotionMode(!isSlowMotionMode);
   }
 
   function updateDraggedLandmark(event: PointerEvent<HTMLCanvasElement>) {
@@ -512,6 +698,16 @@ export default function App() {
       "analysis.json",
     );
     formData.append("corrections", JSON.stringify({ corrections: Object.values(corrections) }));
+    formData.append(
+      "slow_motion",
+      JSON.stringify({
+        segments: slowMotionSegments.map(({ start_frame, end_frame, speed }) => ({
+          start_frame,
+          end_frame,
+          speed,
+        })),
+      }),
+    );
 
     try {
       const response = await renderVideoRequest(formData);
@@ -548,6 +744,13 @@ export default function App() {
   const selectedCorrection = selectedLandmark !== null
     ? corrections[correctionKey(currentFrame, selectedLandmark)]
     : undefined;
+  const selectedSlowMotion = slowMotionSegments.find((segment) => segment.id === selectedSlowMotionId);
+  const outputFrameCount = analysis
+    ? analysis.metadata.frame_count + slowMotionSegments.reduce(
+      (total, segment) => total + (segment.end_frame - segment.start_frame + 1) * (1 / segment.speed - 1),
+      0,
+    )
+    : 0;
 
   return (
     <main className="page-shell">
@@ -641,8 +844,59 @@ export default function App() {
                         <button className="compact-icon" type="button" title="Frame anterior" aria-label="Frame anterior" onClick={() => goToFrame(currentFrameRef.current - 1)} disabled={currentFrame === 0}>&#9664;</button>
                         <button className="compact-icon" type="button" title="Reproducir o pausar" aria-label="Reproducir o pausar" onClick={() => videoRef.current?.paused ? videoRef.current.play() : videoRef.current?.pause()}>&#9654;&#10074;&#10074;</button>
                         <button className="compact-icon" type="button" title="Frame siguiente" aria-label="Frame siguiente" onClick={() => goToFrame(currentFrameRef.current + 1)} disabled={currentFrame === analysis.metadata.frame_count - 1}>&#9654;</button>
-                        <input aria-label="Frame actual" className="frame-slider" type="range" min="0" max={analysis.metadata.frame_count - 1} value={currentFrame} onChange={(event) => goToFrame(Number(event.target.value))} />
+                        <div
+                          ref={timelineRef}
+                          className={`frame-timeline ${isSlowMotionMode ? "is-slow-motion-mode" : ""}`}
+                          role="slider"
+                          aria-label="Timeline de frames y lapsos de slow motion"
+                          aria-valuemin={0}
+                          aria-valuemax={analysis.metadata.frame_count - 1}
+                          aria-valuenow={currentFrame}
+                          onPointerDown={startTimelineDrag}
+                          onPointerMove={updateTimelineDrag}
+                          onPointerUp={stopTimelineDrag}
+                          onPointerCancel={stopTimelineDrag}
+                        >
+                          {slowMotionSegments.map((segment) => (
+                            <span
+                              key={segment.id}
+                              className={`slow-motion-segment ${segment.id === selectedSlowMotionId ? "is-selected" : ""}`}
+                              data-segment-id={segment.id}
+                              style={{
+                                left: `${segment.start_frame / (analysis.metadata.frame_count - 1) * 100}%`,
+                                width: `${Math.max(0.7, (segment.end_frame - segment.start_frame + 1) / analysis.metadata.frame_count * 100)}%`,
+                              }}
+                            >
+                              <button type="button" className="segment-handle" data-segment-handle="start" aria-label="Ajustar inicio del lapso" />
+                              <span>1/{1 / segment.speed}</span>
+                              <button type="button" className="segment-handle" data-segment-handle="end" aria-label="Ajustar final del lapso" />
+                            </span>
+                          ))}
+                          {slowMotionDraft && (
+                            <span
+                              className="slow-motion-draft"
+                              style={{
+                                left: `${slowMotionDraft.start_frame / (analysis.metadata.frame_count - 1) * 100}%`,
+                                width: `${Math.max(0.7, (slowMotionDraft.end_frame - slowMotionDraft.start_frame + 1) / analysis.metadata.frame_count * 100)}%`,
+                              }}
+                            />
+                          )}
+                          <span className="timeline-playhead" style={{ left: `${currentFrame / (analysis.metadata.frame_count - 1) * 100}%` }} />
+                        </div>
                         <span className="frame-readout">{currentFrame + 1} / {analysis.metadata.frame_count}</span>
+                      </div>
+                      <div className="slow-motion-row">
+                        <button className={`slow-motion-toggle ${isSlowMotionMode ? "is-active" : ""}`} type="button" onClick={toggleSlowMotionMode}>Slow Motion</button>
+                        {isSlowMotionMode && slowMotionDraft ? <>
+                          <span className="slow-motion-selection">{slowMotionDraft.start_frame + 1}-{slowMotionDraft.end_frame + 1}</span>
+                          {SLOW_MOTION_SPEEDS.map((speed) => <button key={speed} type="button" onClick={() => addSlowMotionSegment(speed)}>1/{1 / speed}</button>)}
+                          <button type="button" title="Cancelar lapso" onClick={() => setSlowMotionDraft(null)}>&#215;</button>
+                        </> : isSlowMotionMode && selectedSlowMotion ? <>
+                          <span className="slow-motion-selection">{selectedSlowMotion.start_frame + 1}-{selectedSlowMotion.end_frame + 1}</span>
+                          {SLOW_MOTION_SPEEDS.map((speed) => <button key={speed} className={selectedSlowMotion.speed === speed ? "is-active" : ""} type="button" onClick={() => updateSelectedSlowMotionSpeed(speed)}>1/{1 / speed}</button>)}
+                          <button type="button" title="Eliminar lapso" onClick={removeSelectedSlowMotionSegment}>&#128465;</button>
+                        </> : isSlowMotionMode ? <span className="slow-motion-hint">Arrastra sobre la timeline para crear un lapso.</span> : null}
+                        {slowMotionSegments.length > 0 && <span className="output-duration">Salida: ~{Math.round(outputFrameCount / analysis.metadata.fps * 10) / 10}s</span>}
                       </div>
                       <div className="compact-actions">
                         <span className="correction-status">{selectedLandmark === null ? "Selecciona un punto" : LANDMARK_NAMES[selectedLandmark]} · {Object.keys(corrections).length} keys</span>

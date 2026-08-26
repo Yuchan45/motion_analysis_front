@@ -38,4 +38,5 @@ npm run preview
 1. Selecciona un video MP4, MOV, AVI, MKV o WebM.
 2. Espera el analisis de pose del backend.
 3. Pausa el video, navega frame a frame y arrastra los landmarks necesarios.
-4. Genera y descarga el MP4 con el skeleton corregido.
+4. Arrastra sobre la timeline para definir lapsos de slow motion a `1/2`, `1/4` o `1/8`.
+5. Genera y descarga el MP4 con el skeleton corregido.

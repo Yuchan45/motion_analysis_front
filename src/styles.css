@@ -765,6 +765,138 @@ h1 {
   accent-color: var(--signal);
 }
 
+.frame-timeline {
+  position: relative;
+  height: 24px;
+  min-width: 40px;
+  flex: 1;
+  overflow: hidden;
+  border: 1px solid rgba(240, 238, 229, 0.48);
+  background: rgba(240, 238, 229, 0.13);
+  cursor: ew-resize;
+}
+
+.frame-timeline.is-slow-motion-mode {
+  cursor: crosshair;
+}
+
+.timeline-playhead {
+  position: absolute;
+  z-index: 3;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: white;
+  pointer-events: none;
+}
+
+.slow-motion-segment,
+.slow-motion-draft {
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  bottom: 3px;
+  display: flex;
+  min-width: 5px;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+  border: 1px solid #d78313;
+  background: rgba(215, 131, 19, 0.8);
+  color: #fff;
+  cursor: pointer;
+  font-family: "Lucida Console", "Courier New", monospace;
+  font-size: 0.56rem;
+  line-height: 1;
+}
+
+.slow-motion-segment.is-selected {
+  border-color: var(--acid);
+  background: rgba(200, 244, 91, 0.78);
+  color: var(--ink);
+}
+
+.slow-motion-draft {
+  z-index: 2;
+  border-style: dashed;
+  background: rgba(36, 124, 169, 0.65);
+  pointer-events: none;
+}
+
+.segment-handle {
+  width: 5px;
+  height: 100%;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: rgba(20, 34, 38, 0.5);
+  cursor: ew-resize;
+}
+
+.slow-motion-row {
+  display: flex;
+  min-height: 21px;
+  gap: 0.35rem;
+  align-items: center;
+  margin-top: 0.35rem;
+  font-family: "Lucida Console", "Courier New", monospace;
+  font-size: 0.6rem;
+  line-height: 1;
+}
+
+.slow-motion-label {
+  color: var(--acid);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.slow-motion-selection,
+.slow-motion-hint,
+.output-duration {
+  color: rgba(240, 238, 229, 0.72);
+}
+
+.slow-motion-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.output-duration {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.slow-motion-row button {
+  min-width: 27px;
+  height: 19px;
+  padding: 0 0.35rem;
+  border: 1px solid rgba(240, 238, 229, 0.55);
+  color: var(--paper);
+  background: transparent;
+  cursor: pointer;
+  font-size: inherit;
+}
+
+.slow-motion-row button:hover,
+.slow-motion-row button.is-active {
+  color: var(--ink);
+  background: var(--acid);
+}
+
+.slow-motion-row .slow-motion-toggle {
+  min-width: auto;
+  border-color: var(--acid);
+  color: var(--acid);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.slow-motion-row .slow-motion-toggle.is-active {
+  color: var(--ink);
+  background: var(--acid);
+}
+
 .compact-icon,
 .compact-actions button {
   display: inline-grid;
