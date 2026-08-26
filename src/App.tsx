@@ -25,6 +25,7 @@ type Analysis = {
   landmark_indices: number[];
   frames: Array<Landmark[] | null>;
   frame_times: number[];
+  estimated_frames: boolean[];
 };
 type Correction = { frame_index: number; landmark_index: number; x: number; y: number };
 type SlowMotionSpeed = 0.5 | 0.25 | 0.125;
@@ -246,17 +247,18 @@ export default function App() {
 
     const frame = currentAnalysis.frames[frameIndex];
     if (!frame) return;
+    const isEstimatedFrame = currentAnalysis.estimated_frames?.[frameIndex] ?? false;
     const landmarks = correctedLandmarks(frameIndex, frame, correctionsRef.current);
     const landmarkMap = new Map(
       currentAnalysis.landmark_indices.map((index, position) => [index, landmarks[position]]),
     );
 
-    context.strokeStyle = "#c4e844";
+    context.strokeStyle = isEstimatedFrame ? "#f2ad3d" : "#c4e844";
     context.lineWidth = 1.5 * pixelRatio;
     for (const [start, end] of POSE_CONNECTIONS) {
       const startPoint = landmarkMap.get(start);
       const endPoint = landmarkMap.get(end);
-      if (!startPoint || !endPoint || startPoint.visibility < 0.45 || endPoint.visibility < 0.45) continue;
+      if (!startPoint || !endPoint) continue;
       context.beginPath();
       context.moveTo(viewport.x + startPoint.x * viewport.width, viewport.y + startPoint.y * viewport.height);
       context.lineTo(viewport.x + endPoint.x * viewport.width, viewport.y + endPoint.y * viewport.height);
@@ -264,11 +266,10 @@ export default function App() {
     }
 
     for (const [index, landmark] of landmarkMap) {
-      if (landmark.visibility < 0.45) continue;
       const x = viewport.x + landmark.x * viewport.width;
       const y = viewport.y + landmark.y * viewport.height;
       context.beginPath();
-      context.fillStyle = index === selectedLandmark ? "#ffffff" : "#ff4a18";
+      context.fillStyle = index === selectedLandmark ? "#ffffff" : isEstimatedFrame ? "#f2ad3d" : "#ff4a18";
       context.arc(x, y, (index === selectedLandmark ? 4 : 2.5) * pixelRatio, 0, Math.PI * 2);
       context.fill();
       context.strokeStyle = "#142226";
@@ -636,7 +637,6 @@ export default function App() {
     let closestDistance = Number.POSITIVE_INFINITY;
 
     landmarks.forEach((landmark, position) => {
-      if (landmark.visibility < 0.45) return;
       const distance = Math.hypot((landmark.x - x) * viewport.width, (landmark.y - y) * viewport.height);
       if (distance < closestDistance) {
         closestIndex = BODY_LANDMARK_INDICES[position];
@@ -725,6 +725,7 @@ export default function App() {
 
   const isBusy = requestState === "analyzing" || requestState === "exporting";
   const hasPose = Boolean(analysis?.frames[currentFrame]);
+  const hasEstimatedPose = Boolean(analysis?.estimated_frames?.[currentFrame]);
   const activeStep = failedStep ?? (requestState === "exporting" || requestState === "complete"
     ? 3
     : analysis
@@ -838,6 +839,7 @@ export default function App() {
                   <video ref={videoRef} className="editor-video" src={sourceUrl} playsInline onLoadedMetadata={() => drawOverlay(currentFrame)}>Tu navegador no puede reproducir este video.</video>
                   <canvas ref={canvasRef} className={`pose-canvas ${hasPose ? "is-editable" : ""}`} aria-label="Skeleton corporal editable" onPointerDown={startDragging} onPointerMove={updateDraggedLandmark} onPointerUp={stopDragging} onPointerCancel={stopDragging} />
                   {analysis && !hasPose && <p className="no-pose">No hubo pose detectada en este frame.</p>}
+                  {analysis && hasEstimatedPose && <p className="estimated-pose">Pose estimada: revisa y ajusta si es necesario.</p>}
                   {analysis && (
                     <div className="editor-controls" aria-label="Controles de frame">
                       <div className="transport-row">
