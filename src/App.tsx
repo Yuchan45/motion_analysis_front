@@ -1,5 +1,6 @@
 import { FormEvent, PointerEvent, useEffect, useRef, useState } from "react";
 import { analyzeVideoRequest, renderVideoRequest } from "./api";
+import { Toast, ToastAction, ToastType } from "./components/Toast";
 
 const BODY_LANDMARK_INDICES = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
 const POSE_CONNECTIONS = [
@@ -27,6 +28,14 @@ type Analysis = {
 };
 type Correction = { frame_index: number; landmark_index: number; x: number; y: number };
 type DragState = { landmarkIndex: number; pointerId: number };
+type ToastState = {
+  id: number;
+  type: ToastType;
+  message?: string;
+  autoCloseMs?: number | null;
+  actions?: ToastAction[];
+  onClose?: () => void;
+};
 type FrameCallbackVideo = HTMLVideoElement & {
   cancelVideoFrameCallback?: (handle: number) => void;
   requestVideoFrameCallback?: (
@@ -123,9 +132,12 @@ export default function App() {
   const [requestState, setRequestState] = useState<RequestState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [failedStep, setFailedStep] = useState<number | null>(null);
+  const [viewedStep, setViewedStep] = useState(1);
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [stageSize, setStageSize] = useState<{ width: number; height: number } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const toastIdRef = useRef(0);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -134,9 +146,11 @@ export default function App() {
   const analysisRef = useRef(analysis);
   const drawOverlayRef = useRef<(frameIndex: number) => void>(() => undefined);
   const dragRef = useRef<DragState | null>(null);
+  const currentFrameRef = useRef(currentFrame);
 
   correctionsRef.current = corrections;
   analysisRef.current = analysis;
+  currentFrameRef.current = currentFrame;
 
   useEffect(() => () => {
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
@@ -161,18 +175,22 @@ export default function App() {
 
     const resizeStage = () => {
       const aspectRatio = analysis.metadata.width / analysis.metadata.height;
-      const maxHeight = Math.min(window.innerHeight - 250, 720);
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const maxHeight = Math.max(180, viewportHeight - 105);
       const width = Math.min(workspace.clientWidth, maxHeight * aspectRatio);
       setStageSize({ width: Math.round(width), height: Math.round(width / aspectRatio) });
     };
 
     resizeStage();
     const observer = new ResizeObserver(resizeStage);
+    const viewport = window.visualViewport;
     observer.observe(workspace);
     window.addEventListener("resize", resizeStage);
+    viewport?.addEventListener("resize", resizeStage);
     return () => {
       observer.disconnect();
       window.removeEventListener("resize", resizeStage);
+      viewport?.removeEventListener("resize", resizeStage);
     };
   }, [analysis]);
 
@@ -237,6 +255,7 @@ export default function App() {
     const frameVideo = video as FrameCallbackVideo;
     const paint = (mediaTime: number) => {
       const nextFrame = frameFromTime(mediaTime, analysis);
+      currentFrameRef.current = nextFrame;
       setCurrentFrame((previous) => (previous === nextFrame ? previous : nextFrame));
       drawOverlayRef.current(nextFrame);
     };
@@ -276,10 +295,21 @@ export default function App() {
 
   useEffect(() => {
     drawOverlay(currentFrame);
-  }, [analysis, corrections, currentFrame, selectedLandmark]);
+  }, [analysis, corrections, currentFrame, selectedLandmark, stageSize, isFullscreen]);
 
-  function selectVideo(file: File | null) {
-    if (!file) return;
+  function closeToast() {
+    setToast((currentToast) => {
+      currentToast?.onClose?.();
+      return null;
+    });
+  }
+
+  function showToast(nextToast: Omit<ToastState, "id">) {
+    toastIdRef.current += 1;
+    setToast({ ...nextToast, id: toastIdRef.current });
+  }
+
+  function applySelectedVideo(file: File) {
     setSelectedVideo(file);
     setSourceUrl(URL.createObjectURL(file));
     setResultUrl(null);
@@ -290,11 +320,38 @@ export default function App() {
     setStageSize(null);
     setErrorMessage("");
     setFailedStep(null);
+    setViewedStep(1);
     setRequestState("idle");
   }
 
-  async function analyzeVideo(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function cancelPendingVideo() {
+    if (inputRef.current) inputRef.current.value = "";
+  }
+
+  function selectVideo(file: File | null) {
+    if (!file) return;
+    if (analysis || resultUrl) {
+      showToast({
+        type: "warning",
+        message: "Al analizar otro video se perderan los marcadores y el video actualmente en progreso.",
+        actions: [
+          { label: "Cancelar", tone: "secondary", onClick: closeToast },
+          {
+            label: "Analizar otro video",
+            onClick: () => {
+              applySelectedVideo(file);
+              setToast(null);
+            },
+          },
+        ],
+        onClose: cancelPendingVideo,
+      });
+      return;
+    }
+    applySelectedVideo(file);
+  }
+
+  async function startAnalysis() {
     if (!selectedVideo || requestState === "analyzing" || requestState === "exporting") return;
 
     setRequestState("analyzing");
@@ -311,20 +368,47 @@ export default function App() {
       setCorrections({});
       setCurrentFrame(0);
       setRequestState("editing");
+      setViewedStep(2);
+      showToast({ type: "success", message: "Landmarks listos para revisar.", autoCloseMs: 3500 });
     } catch (error) {
       setRequestState("error");
       setErrorMessage(error instanceof Error ? error.message : "No se pudo conectar con el servidor.");
       setFailedStep(1);
+      setViewedStep(1);
     }
+  }
+
+  function analyzeVideo(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void startAnalysis();
+  }
+
+  function requestReanalysis() {
+    showToast({
+      type: "warning",
+      message: "Reanalizar reemplazara los landmarks actuales y eliminara todos los marcadores ajustados manualmente.",
+      actions: [
+        { label: "Cancelar", tone: "secondary", onClick: closeToast },
+        {
+          label: "Reanalizar desde cero",
+          onClick: () => {
+            setToast(null);
+            void startAnalysis();
+          },
+        },
+      ],
+    });
   }
 
   function goToFrame(nextFrame: number) {
     if (!analysis || !videoRef.current) return;
     const frame = Math.min(analysis.metadata.frame_count - 1, Math.max(0, nextFrame));
-    videoRef.current.pause();
-    videoRef.current.currentTime = frame / analysis.metadata.fps;
+    const video = videoRef.current;
+    video.pause();
+    currentFrameRef.current = frame;
     setCurrentFrame(frame);
-    requestAnimationFrame(() => drawOverlay(frame));
+    // Use the source timestamps so manual stepping matches variable-frame-rate video too.
+    video.currentTime = analysis.frame_times[frame] ?? frame / analysis.metadata.fps;
   }
 
   function updateDraggedLandmark(event: PointerEvent<HTMLCanvasElement>) {
@@ -411,6 +495,7 @@ export default function App() {
     setRequestState("editing");
     setFailedStep(null);
     setErrorMessage("");
+    setViewedStep(2);
   }
 
   async function exportVideo() {
@@ -418,6 +503,7 @@ export default function App() {
     setRequestState("exporting");
     setErrorMessage("");
     setFailedStep(null);
+    setViewedStep(3);
     const formData = new FormData();
     formData.append("video", selectedVideo);
     formData.append(
@@ -432,10 +518,12 @@ export default function App() {
       if (!response.ok) throw new Error(await getErrorMessage(response));
       setResultUrl(URL.createObjectURL(await response.blob()));
       setRequestState("complete");
+      showToast({ type: "success", message: "El MP4 corregido esta listo.", autoCloseMs: 4000 });
     } catch (error) {
       setRequestState("error");
       setErrorMessage(error instanceof Error ? error.message : "No se pudo exportar el video.");
       setFailedStep(3);
+      setViewedStep(3);
     }
   }
 
@@ -468,50 +556,72 @@ export default function App() {
           <span className="brand-mark" aria-hidden="true">MA</span>
           Motion Analysis
         </a>
+        <nav className="workflow-stepper" aria-label="Progreso del analisis">
+          <ol className="workflow-steps">
+            {WORKFLOW_STEPS.map((label, index) => {
+              const step = index + 1;
+              const canNavigate = !isBusy && step <= activeStep;
+              const state = step === failedStep
+                ? "is-error"
+                : step < activeStep || (step === 3 && requestState === "complete")
+                ? "is-complete"
+                : step === activeStep
+                  ? "is-active"
+                  : "is-pending";
+              return (
+                <li key={label} className={`workflow-step ${state} ${canNavigate ? "is-navigable" : ""}`}>
+                  <button
+                    className="workflow-step-control"
+                    type="button"
+                    onClick={() => setViewedStep(step)}
+                    disabled={!canNavigate}
+                    aria-current={step === viewedStep ? "step" : undefined}
+                    aria-label={`${label}${canNavigate ? ", abrir paso" : ", aun no disponible"}`}
+                  >
+                    <span className="step-dot">{step}</span>
+                    <span className="step-label">{label}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+          <p className="visually-hidden" role="status" aria-live="polite">{workflowMessage}</p>
+        </nav>
         <span className="version">MVP / EDITOR</span>
       </header>
 
-      <nav className="workflow-stepper" aria-label="Progreso del analisis">
-        <ol className="workflow-steps">
-          {WORKFLOW_STEPS.map((label, index) => {
-            const step = index + 1;
-            const state = step === failedStep
-              ? "is-error"
-              : step < activeStep || (step === 3 && requestState === "complete")
-              ? "is-complete"
-              : step === activeStep
-                ? "is-active"
-                : "is-pending";
-            return (
-              <li key={label} className={`workflow-step ${state}`} aria-current={step === activeStep ? "step" : undefined}>
-                <span className="step-dot">{step}</span>
-                <span className="step-label">{label}</span>
-              </li>
-            );
-          })}
-        </ol>
-        <p className={`workflow-message ${isBusy ? "is-busy" : ""} ${failedStep ? "is-error" : ""}`} role="status" aria-live="polite">
-          {workflowMessage}
-        </p>
-      </nav>
-
       <div className="workflow-viewport">
-        <div className="workflow-track" style={{ transform: `translateX(-${(activeStep - 1) * 100}%)` }}>
+        <div className="workflow-track" style={{ transform: `translateX(-${(viewedStep - 1) * 100}%)` }}>
           <section className="workflow-panel upload-view" aria-labelledby="page-title">
             <div className="hero-copy">
               <p className="eyebrow">Pose correction for pitching</p>
               <h1 id="page-title">Ajusta el frame que el modelo no pudo leer.</h1>
               <p className="intro">Carga un video, revisa el skeleton y exporta una version corregida.</p>
             </div>
-            <form className="upload-panel" onSubmit={analyzeVideo}>
+            <form className={`upload-panel ${selectedVideo ? "has-selected-video" : ""}`} onSubmit={analyzeVideo}>
               <span className="panel-index">01 / ANALISIS</span>
               <input ref={inputRef} className="visually-hidden" id="pitch-video" type="file" accept="video/mp4,video/quicktime,video/x-msvideo,video/webm,.mkv" onChange={(event) => selectVideo(event.target.files?.[0] ?? null)} />
               <button className="file-picker" type="button" onClick={() => { if (inputRef.current) inputRef.current.value = ""; inputRef.current?.click(); }} disabled={isBusy}>
                 <span className="picker-symbol" aria-hidden="true">+</span>
                 <span><strong>{selectedVideo ? "Cambiar video" : "Seleccionar video"}</strong><small>MP4, MOV, AVI, MKV o WebM</small></span>
               </button>
-              {selectedVideo && <div className="file-data"><span>{selectedVideo.name}</span><span>{formatFileSize(selectedVideo.size)}</span></div>}
-              <button className="analyze-button" type="submit" disabled={!selectedVideo || isBusy}>{requestState === "analyzing" ? "Detectando landmarks..." : "Analizar movimiento"}<span aria-hidden="true">&#8599;</span></button>
+              {selectedVideo && (
+                <div className="file-data">
+                  <span className="file-loaded-details">
+                    <span className="file-loaded-status"><span aria-hidden="true">&#10003;</span> Video cargado</span>
+                    <strong title={selectedVideo.name}>{selectedVideo.name}</strong>
+                  </span>
+                  <span className="file-size">{formatFileSize(selectedVideo.size)}</span>
+                </div>
+              )}
+              {analysis ? (
+                <div className="existing-analysis-actions">
+                  <button className="analyze-button" type="button" onClick={() => setViewedStep(2)} disabled={isBusy}>Continuar revision<span aria-hidden="true">&#8594;</span></button>
+                  <button className="reanalyze-button" type="button" onClick={requestReanalysis} disabled={isBusy}>Reanalizar desde cero</button>
+                </div>
+              ) : (
+                <button className="analyze-button" type="submit" disabled={!selectedVideo || isBusy}>{requestState === "analyzing" ? "Detectando landmarks..." : "Analizar movimiento"}<span aria-hidden="true">&#8599;</span></button>
+              )}
               {requestState === "analyzing" && <div className="progress" aria-live="polite"><span className="progress-line" />Procesando el video localmente.</div>}
               {failedStep === 1 && <p className="error-message" role="alert">{errorMessage}</p>}
             </form>
@@ -528,9 +638,9 @@ export default function App() {
                   {analysis && (
                     <div className="editor-controls" aria-label="Controles de frame">
                       <div className="transport-row">
-                        <button className="compact-icon" type="button" title="Frame anterior" aria-label="Frame anterior" onClick={() => goToFrame(currentFrame - 1)} disabled={currentFrame === 0}>&#9664;</button>
+                        <button className="compact-icon" type="button" title="Frame anterior" aria-label="Frame anterior" onClick={() => goToFrame(currentFrameRef.current - 1)} disabled={currentFrame === 0}>&#9664;</button>
                         <button className="compact-icon" type="button" title="Reproducir o pausar" aria-label="Reproducir o pausar" onClick={() => videoRef.current?.paused ? videoRef.current.play() : videoRef.current?.pause()}>&#9654;&#10074;&#10074;</button>
-                        <button className="compact-icon" type="button" title="Frame siguiente" aria-label="Frame siguiente" onClick={() => goToFrame(currentFrame + 1)} disabled={currentFrame === analysis.metadata.frame_count - 1}>&#9654;</button>
+                        <button className="compact-icon" type="button" title="Frame siguiente" aria-label="Frame siguiente" onClick={() => goToFrame(currentFrameRef.current + 1)} disabled={currentFrame === analysis.metadata.frame_count - 1}>&#9654;</button>
                         <input aria-label="Frame actual" className="frame-slider" type="range" min="0" max={analysis.metadata.frame_count - 1} value={currentFrame} onChange={(event) => goToFrame(Number(event.target.value))} />
                         <span className="frame-readout">{currentFrame + 1} / {analysis.metadata.frame_count}</span>
                       </div>
@@ -556,6 +666,16 @@ export default function App() {
           </section>
         </div>
       </div>
+      {toast && (
+        <Toast
+          key={toast.id}
+          type={toast.type}
+          message={toast.message}
+          autoCloseMs={toast.autoCloseMs}
+          actions={toast.actions}
+          onClose={closeToast}
+        />
+      )}
     </main>
   );
 }
