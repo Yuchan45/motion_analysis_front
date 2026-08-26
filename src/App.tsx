@@ -1,9 +1,5 @@
 import { FormEvent, PointerEvent, useEffect, useRef, useState } from "react";
-
-const ANALYZE_URL =
-  import.meta.env.VITE_ANALYZE_URL ?? "http://localhost:8000/analyze";
-const RENDER_URL =
-  import.meta.env.VITE_RENDER_URL ?? ANALYZE_URL.replace(/\/analyze$/, "/render");
+import { analyzeVideoRequest, renderVideoRequest } from "./api";
 
 const BODY_LANDMARK_INDICES = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
 const POSE_CONNECTIONS = [
@@ -308,7 +304,7 @@ export default function App() {
     formData.append("video", selectedVideo);
 
     try {
-      const response = await fetch(ANALYZE_URL, { method: "POST", body: formData });
+      const response = await analyzeVideoRequest(formData);
       if (!response.ok) throw new Error(await getErrorMessage(response));
       const nextAnalysis = (await response.json()) as Analysis;
       setAnalysis(nextAnalysis);
@@ -432,7 +428,7 @@ export default function App() {
     formData.append("corrections", JSON.stringify({ corrections: Object.values(corrections) }));
 
     try {
-      const response = await fetch(RENDER_URL, { method: "POST", body: formData });
+      const response = await renderVideoRequest(formData);
       if (!response.ok) throw new Error(await getErrorMessage(response));
       setResultUrl(URL.createObjectURL(await response.blob()));
       setRequestState("complete");
