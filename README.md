@@ -9,13 +9,13 @@ Interfaz web local para cargar un video de pitching, revisar el skeleton detecta
 
 ## Configuracion
 
-El archivo `.env` incluido apunta al backend local:
+El archivo `.env.example` contiene la configuracion local por defecto:
 
 ```env
 VITE_API_URL=http://localhost:8000
 ```
 
-Para otra instalacion, copia `.env.example` como `.env` y ajusta esta URL. Las variables del frontend deben empezar con `VITE_`. Las rutas `/analyze` y `/render` se definen en `src/api.ts`.
+Antes de ejecutar, copia `.env.example` como `.env` y ajusta esta URL si fuera necesario. El archivo `.env` esta ignorado por Git. Las variables del frontend deben empezar con `VITE_` y no deben contener secretos: Vite las expone en el navegador. Las rutas `/analyze` y `/render` se definen en `src/api.ts`.
 
 ## Ejecutar
 
