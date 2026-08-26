@@ -1,6 +1,16 @@
 import { FormEvent, PointerEvent, useEffect, useRef, useState } from "react";
-import { analyzeVideoRequest, renderVideoRequest } from "./api";
-import { Toast, ToastAction, ToastType } from "./components/Toast";
+import { Toast, ToastAction, ToastType } from "../../shared/ui/Toast";
+import {
+  analyzeVideo as analyzeVideoRequest,
+  renderVideo as renderVideoRequest,
+} from "./api/videoAnalysisApi";
+import {
+  Analysis,
+  Correction,
+  Landmark,
+  SlowMotionSegment,
+  SlowMotionSpeed,
+} from "./types/videoAnalysis.types";
 
 const BODY_LANDMARK_INDICES = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
 const POSE_CONNECTIONS = [
@@ -19,22 +29,6 @@ const LANDMARK_NAMES: Record<number, string> = {
 
 type RequestState = "idle" | "analyzing" | "editing" | "exporting" | "complete" | "error";
 
-type Landmark = { x: number; y: number; z: number; visibility: number };
-type Analysis = {
-  metadata: { fps: number; width: number; height: number; frame_count: number };
-  landmark_indices: number[];
-  frames: Array<Landmark[] | null>;
-  frame_times: number[];
-  estimated_frames: boolean[];
-};
-type Correction = { frame_index: number; landmark_index: number; x: number; y: number };
-type SlowMotionSpeed = 0.5 | 0.25 | 0.125;
-type SlowMotionSegment = {
-  id: number;
-  start_frame: number;
-  end_frame: number;
-  speed: SlowMotionSpeed;
-};
 type SlowMotionDraft = Pick<SlowMotionSegment, "start_frame" | "end_frame">;
 type DragState = { landmarkIndex: number; pointerId: number };
 type TimelineDragState = {
@@ -144,7 +138,7 @@ function correctedLandmarks(
   });
 }
 
-export default function App() {
+export default function VideoAnalysisFeature() {
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
@@ -400,11 +394,8 @@ export default function App() {
     setRequestState("analyzing");
     setErrorMessage("");
     setFailedStep(null);
-    const formData = new FormData();
-    formData.append("video", selectedVideo);
-
     try {
-      const response = await analyzeVideoRequest(formData);
+      const response = await analyzeVideoRequest(selectedVideo);
       if (!response.ok) throw new Error(await getErrorMessage(response));
       const nextAnalysis = (await response.json()) as Analysis;
       setAnalysis(nextAnalysis);
@@ -690,27 +681,13 @@ export default function App() {
     setErrorMessage("");
     setFailedStep(null);
     setViewedStep(3);
-    const formData = new FormData();
-    formData.append("video", selectedVideo);
-    formData.append(
-      "analysis",
-      new Blob([JSON.stringify(analysis)], { type: "application/json" }),
-      "analysis.json",
-    );
-    formData.append("corrections", JSON.stringify({ corrections: Object.values(corrections) }));
-    formData.append(
-      "slow_motion",
-      JSON.stringify({
-        segments: slowMotionSegments.map(({ start_frame, end_frame, speed }) => ({
-          start_frame,
-          end_frame,
-          speed,
-        })),
-      }),
-    );
-
     try {
-      const response = await renderVideoRequest(formData);
+      const response = await renderVideoRequest({
+        video: selectedVideo,
+        analysis,
+        corrections: Object.values(corrections),
+        slowMotionSegments,
+      });
       if (!response.ok) throw new Error(await getErrorMessage(response));
       setResultUrl(URL.createObjectURL(await response.blob()));
       setRequestState("complete");
