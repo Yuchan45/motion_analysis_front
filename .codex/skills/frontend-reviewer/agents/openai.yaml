@@ -1,0 +1,4 @@
+interface:
+  display_name: "Frontend Reviewer"
+  short_description: "Revisa cambios contra la arquitectura frontend"
+  default_prompt: "Use $frontend-reviewer to review my frontend changes against Motion Analysis architecture."
