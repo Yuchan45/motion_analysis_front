@@ -2,7 +2,7 @@ import { createContext, ReactNode, useContext, useEffect, useMemo, useState } fr
 import { apiRequest } from "../../shared/api/apiClient";
 import { User } from "../../shared/api/contracts";
 
-type AuthContextValue = { user: User | null; loading: boolean; login(email: string, password: string): Promise<void>; register(email: string, password: string): Promise<void>; logout(): Promise<void> };
+type AuthContextValue = { user: User | null; loading: boolean; login(email: string, password: string): Promise<void>; register(data: FormData): Promise<void>; logout(): Promise<void> };
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -12,7 +12,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(() => ({
     user, loading,
     async login(email, password) { setUser(await apiRequest<User>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) })); },
-    async register(email, password) { setUser(await apiRequest<User>("/auth/register", { method: "POST", body: JSON.stringify({ email, password }) })); },
+    async register(data) { setUser(await apiRequest<User>("/auth/register", { method: "POST", body: data })); },
     async logout() { await apiRequest<void>("/auth/logout", { method: "POST" }); setUser(null); },
   }), [loading, user]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

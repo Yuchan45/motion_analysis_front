@@ -1163,22 +1163,44 @@ footer {
 .auth-shell,
 .centered-state {
   display: grid;
-  min-height: 100vh;
+  min-height: 100dvh;
   place-items: center;
-  padding: 2rem;
+  padding: clamp(0.75rem, 2vw, 1.5rem);
 }
 
 .auth-card {
-  width: min(100%, 520px);
-  padding: clamp(1.5rem, 5vw, 3.5rem);
+  width: min(100%, 560px);
+  max-height: calc(100dvh - clamp(1.5rem, 4vw, 3rem));
+  overflow: auto;
+  padding: clamp(1rem, 3vw, 1.75rem);
   border: 1px solid var(--ink);
-  background: var(--paper);
-  box-shadow: 12px 12px 0 var(--ink);
+  background: rgba(240, 238, 229, 0.96);
+  box-shadow: 7px 7px 0 var(--ink);
+}
+
+.auth-heading {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.auth-heading .brand-mark {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+}
+
+.auth-heading .eyebrow {
+  margin: 0 0 0.18rem;
+  font-size: 0.62rem;
 }
 
 .auth-card h1 {
-  margin: 1rem 0 2rem;
-  font-size: clamp(3rem, 9vw, 5rem);
+  margin: 0;
+  font-size: clamp(1.85rem, 4vw, 2.7rem);
+  letter-spacing: -0.055em;
+  line-height: 0.95;
 }
 
 .auth-card form,
@@ -1188,14 +1210,369 @@ footer {
 }
 
 .auth-card form {
-  gap: 1.1rem;
+  gap: 0.72rem;
 }
 
 .auth-card input {
-  width: 100%;
-  padding: 0.9rem;
+  min-height: 42px;
+  padding: 0.65rem 0.72rem;
   border: 1px solid var(--ink);
   background: white;
+}
+
+.auth-card small {
+  color: rgba(20, 34, 38, 0.7);
+  font-size: 0.72rem;
+}
+
+.avatar-picker {
+  gap: 0.55rem;
+  padding: 0;
+  border: 0;
+}
+
+.avatar-picker legend {
+  font-weight: 700;
+}
+
+.avatar-source-options,
+.dicebear-styles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.avatar-source-options button,
+.avatar-regenerate,
+.dicebear-styles button {
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+}
+
+.avatar-source-options button,
+.avatar-regenerate {
+  padding: 0.38rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.avatar-source-options button.is-selected,
+.avatar-source-options button:hover,
+.avatar-regenerate:hover,
+.dicebear-styles button.is-selected {
+  background: var(--acid);
+}
+
+.avatar-upload,
+.dicebear-picker {
+  gap: 0.45rem;
+  padding: 0.55rem;
+  border: 1px dashed var(--ink);
+}
+
+.dicebear-styles button {
+  display: grid;
+  width: 54px;
+  gap: 0.2rem;
+  padding: 0.25rem;
+  text-transform: capitalize;
+}
+
+.dicebear-styles img,
+.avatar-preview {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--line);
+  background: white;
+  object-fit: cover;
+}
+
+.avatar-preview {
+  width: 58px;
+}
+
+.auth-switch {
+  margin: 0.9rem 0 0;
+  font-size: 0.78rem;
+}
+
+.auth-switch a {
+  color: var(--signal);
+  font-weight: 700;
+}
+
+/* Keep authentication focused: the form is compact, while avatar discovery lives in a modal. */
+.auth-shell {
+  align-content: center;
+  overflow-y: auto;
+}
+
+.auth-card {
+  max-height: none;
+  overflow: visible;
+}
+
+.auth-card label,
+.avatar-picker legend {
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.auth-card input {
+  min-height: 38px;
+  padding: 0.52rem 0.62rem;
+  font-size: 0.86rem;
+}
+
+.auth-card .analyze-button {
+  min-height: 42px;
+  margin-top: 0.1rem;
+  padding: 0.68rem 0.8rem;
+  font-size: 0.82rem;
+}
+
+.avatar-picker {
+  margin: 0;
+}
+
+.chosen-avatar {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  padding: 0.42rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.chosen-avatar .avatar-preview {
+  width: 38px;
+  flex: 0 0 auto;
+}
+
+.chosen-avatar div {
+  display: grid;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
+.chosen-avatar strong {
+  font-size: 0.72rem;
+}
+
+.chosen-avatar button {
+  margin-left: auto;
+  padding: 0.32rem 0.45rem;
+  border: 1px solid var(--ink);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.68rem;
+}
+
+.avatar-modal-backdrop {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(20, 34, 38, 0.54);
+  backdrop-filter: blur(3px);
+}
+
+.avatar-modal {
+  width: min(100%, 340px);
+  overflow: hidden;
+  padding: 0.65rem;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  box-shadow: 8px 8px 0 var(--ink);
+}
+
+.avatar-modal header,
+.avatar-modal footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.avatar-modal .eyebrow {
+  margin-bottom: 0.2rem;
+  font-size: 0.62rem;
+}
+
+.avatar-modal h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.25rem, 5vw, 1.6rem);
+  font-weight: 400;
+  letter-spacing: -0.055em;
+}
+
+.modal-close,
+.modal-done {
+  display: grid;
+  min-width: 32px;
+  min-height: 32px;
+  place-items: center;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+}
+
+.modal-close {
+  border-radius: 50%;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.modal-description {
+  margin: 0.55rem 0;
+  color: rgba(20, 34, 38, 0.72);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+
+.avatar-grid button {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  padding: 0.2rem;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: white;
+  cursor: pointer;
+  text-align: center;
+}
+
+.avatar-grid button:hover,
+.avatar-grid button.is-selected {
+  border-color: var(--ink);
+  background: var(--acid);
+}
+
+.avatar-grid img {
+  width: 100%;
+  height: 100%;
+  background: #f7f7f7;
+}
+
+.avatar-grid .avatar-check {
+  position: absolute;
+  top: 0.15rem;
+  right: 0.15rem;
+  display: grid;
+  width: 17px;
+  height: 17px;
+  place-items: center;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  background: var(--paper);
+}
+
+.avatar-modal footer {
+  padding: 0;
+  margin-top: 0.65rem;
+  border: 0;
+}
+
+.avatar-modal .avatar-regenerate,
+.modal-done {
+  min-height: 34px;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.58rem;
+  font-weight: 700;
+}
+
+.modal-done {
+  color: white;
+  background: var(--signal);
+}
+
+.upload-modal {
+  width: min(100%, 310px);
+}
+
+.upload-dropzone {
+  display: grid;
+  min-height: 144px;
+  place-items: center;
+  gap: 0.4rem;
+  padding: 0.65rem;
+  border: 1px dashed var(--ink);
+  background: rgba(255, 255, 255, 0.58);
+  cursor: pointer;
+  text-align: center;
+}
+
+.upload-dropzone:hover {
+  background: var(--acid);
+}
+
+.upload-dropzone input,
+.upload-replace input {
+  display: none;
+}
+
+.upload-dropzone img {
+  width: 108px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1px solid var(--ink);
+  background: white;
+}
+
+.upload-symbol {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.upload-dropzone strong {
+  font-size: 0.76rem;
+}
+
+.upload-dropzone small {
+  color: rgba(20, 34, 38, 0.72);
+  font-size: 0.64rem;
+}
+
+.upload-replace {
+  display: block;
+  margin-top: 0.55rem;
+  padding: 0.42rem 0.55rem;
+  border: 1px solid var(--ink);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.upload-replace:hover {
+  background: var(--acid);
+}
+
+@media (max-height: 700px) {
+  .auth-card { padding: 0.8rem 1rem; }
+  .auth-heading { margin-bottom: 0.65rem; }
+  .auth-card form { gap: 0.5rem; }
+  .dicebear-styles button { width: 46px; }
+  .dicebear-styles button span { display: none; }
 }
 
 .library-shell {
@@ -1208,6 +1585,24 @@ footer {
   display: flex;
   gap: 0.7rem;
   align-items: center;
+}
+
+.header-avatar {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  background: white;
+  object-fit: cover;
+}
+
+.header-avatar.initials {
+  display: inline-grid;
+  place-items: center;
+  color: var(--paper);
+  background: var(--ink);
+  font-size: 0.68rem;
+  font-weight: 700;
 }
 
 .library-user button,
