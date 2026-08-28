@@ -1,0 +1,4 @@
+export type User = { id: string; email: string; createdAt: string; updatedAt: string };
+export type VideoResource = { id: string; title: string; originalFilename: string; mimeType: string; sizeBytes: number; status: "UPLOADING" | "READY" | "FAILED"; createdAt: string; updatedAt: string };
+export type EditorState = { corrections: Array<{ frame_index: number; landmark_index: number; x: number; y: number }>; slowMotionSegments: Array<{ start_frame: number; end_frame: number; speed: 0.5 | 0.25 | 0.125 }> };
+export type AnalysisResource = { id: string; videoId: string; type: string; version: string; status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED"; editorState: EditorState; hasData: boolean; hasResult: boolean; createdAt: string; startedAt: string | null; completedAt: string | null; error: string | null };

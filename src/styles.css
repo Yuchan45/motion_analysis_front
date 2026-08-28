@@ -1159,3 +1159,152 @@ footer {
     animation-iteration-count: 1 !important;
   }
 }
+
+.auth-shell,
+.centered-state {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 2rem;
+}
+
+.auth-card {
+  width: min(100%, 520px);
+  padding: clamp(1.5rem, 5vw, 3.5rem);
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  box-shadow: 12px 12px 0 var(--ink);
+}
+
+.auth-card h1 {
+  margin: 1rem 0 2rem;
+  font-size: clamp(3rem, 9vw, 5rem);
+}
+
+.auth-card form,
+.auth-card label {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.auth-card form {
+  gap: 1.1rem;
+}
+
+.auth-card input {
+  width: 100%;
+  padding: 0.9rem;
+  border: 1px solid var(--ink);
+  background: white;
+}
+
+.library-shell {
+  min-height: 100vh;
+  padding-bottom: 4rem;
+}
+
+.library-user,
+.video-card-actions {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.library-user button,
+.video-card-actions button,
+.video-card-actions a {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.library-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2rem;
+  align-items: end;
+  padding: clamp(3rem, 8vw, 7rem) 4vw;
+}
+
+.library-hero h1 {
+  max-width: 900px;
+  font-size: clamp(3.2rem, 7vw, 7rem);
+}
+
+.primary-link,
+.empty-library a {
+  padding: 1rem 1.2rem;
+  border: 1px solid var(--ink);
+  color: white;
+  background: var(--signal);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+  padding: 0 4vw;
+}
+
+.video-card,
+.empty-library {
+  padding: 1.4rem;
+  border: 1px solid var(--ink);
+  background: rgba(240, 238, 229, 0.9);
+  box-shadow: 7px 7px 0 var(--ink);
+}
+
+.empty-library {
+  margin: 0 4vw;
+}
+
+.video-card h2 {
+  margin: 0.5rem 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2rem;
+  font-weight: 400;
+}
+
+.analysis-history {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+
+.analysis-history li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.analysis-history a {
+  color: var(--ink);
+}
+
+.status,
+.save-state {
+  font-family: "Lucida Console", "Courier New", monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.status-completed,
+.save-saved { color: #547d19; }
+.status-failed,
+.save-error { color: #a42b12; }
+.status-processing,
+.save-saving { color: #d78313; }
+
+@media (max-width: 700px) {
+  .library-hero { grid-template-columns: 1fr; }
+  .library-user { font-size: 0; }
+  .library-user button { font-size: 0.8rem; }
+}

@@ -2,7 +2,10 @@ import { FormEvent, PointerEvent, useEffect, useRef, useState } from "react";
 import { Toast, ToastAction, ToastType } from "../../shared/ui/Toast";
 import {
   analyzeVideo as analyzeVideoRequest,
+  loadAnalysis as loadAnalysisRequest,
+  loadVideo as loadVideoRequest,
   renderVideo as renderVideoRequest,
+  saveEditorState,
 } from "./api/videoAnalysisApi";
 import {
   Analysis,
@@ -102,15 +105,6 @@ function mediaViewport(
   };
 }
 
-async function getErrorMessage(response: Response): Promise<string> {
-  try {
-    const body = (await response.json()) as { detail?: string };
-    return body.detail ?? "No se pudo procesar el video.";
-  } catch {
-    return "No se pudo procesar el video.";
-  }
-}
-
 function correctedLandmarks(
   frameIndex: number,
   landmarks: Landmark[],
@@ -138,8 +132,12 @@ function correctedLandmarks(
   });
 }
 
-export default function VideoAnalysisFeature() {
+type VideoAnalysisFeatureProps = { initialVideoId?: string; initialAnalysisId?: string };
+
+export default function VideoAnalysisFeature({ initialVideoId, initialAnalysisId }: VideoAnalysisFeatureProps) {
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
+  const [videoId, setVideoId] = useState<string | null>(initialVideoId ?? null);
+  const [analysisId, setAnalysisId] = useState<string | null>(initialAnalysisId ?? null);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -157,6 +155,7 @@ export default function VideoAnalysisFeature() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [stageSize, setStageSize] = useState<{ width: number; height: number } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const inputRef = useRef<HTMLInputElement>(null);
   const toastIdRef = useRef(0);
   const workspaceRef = useRef<HTMLDivElement>(null);
@@ -177,6 +176,58 @@ export default function VideoAnalysisFeature() {
   analysisRef.current = analysis;
   currentFrameRef.current = currentFrame;
   slowMotionRef.current = slowMotionSegments;
+
+  useEffect(() => {
+    if (!initialVideoId) return;
+    let cancelled = false;
+    setRequestState("analyzing");
+    const load = async () => {
+      try {
+        if (initialAnalysisId) {
+          const session = await loadAnalysisRequest(initialVideoId, initialAnalysisId);
+          if (cancelled) return;
+          const restoredSegments = session.resource.editorState.slowMotionSegments.map((segment, index) => ({ ...segment, id: index + 1 }));
+          slowMotionIdRef.current = restoredSegments.length;
+          setSelectedVideo(session.file);
+          setSourceUrl(URL.createObjectURL(session.file));
+          setAnalysis(session.data);
+          setCorrections(Object.fromEntries(session.resource.editorState.corrections.map((item) => [correctionKey(item.frame_index, item.landmark_index), item])));
+          setSlowMotionSegments(restoredSegments);
+          setVideoId(initialVideoId);
+          setAnalysisId(initialAnalysisId);
+          setRequestState("editing");
+          setViewedStep(2);
+          setSaveState("saved");
+        } else {
+          const session = await loadVideoRequest(initialVideoId);
+          if (cancelled) return;
+          setSelectedVideo(session.file);
+          setSourceUrl(URL.createObjectURL(session.file));
+          setVideoId(initialVideoId);
+          setRequestState("idle");
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setRequestState("error");
+        setFailedStep(1);
+        setErrorMessage(error instanceof Error ? error.message : "No se pudo cargar el análisis.");
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [initialAnalysisId, initialVideoId]);
+
+  useEffect(() => {
+    if (!analysisId || !analysis || requestState !== "editing") return;
+    setSaveState("saving");
+    const timeout = window.setTimeout(() => {
+      void saveEditorState(analysisId, {
+        corrections: Object.values(corrections),
+        slowMotionSegments: slowMotionSegments.map(({ start_frame, end_frame, speed }) => ({ start_frame, end_frame, speed })),
+      }).then(() => setSaveState("saved")).catch(() => setSaveState("error"));
+    }, 600);
+    return () => window.clearTimeout(timeout);
+  }, [analysis, analysisId, corrections, requestState, slowMotionSegments]);
 
   useEffect(() => () => {
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
@@ -344,6 +395,8 @@ export default function VideoAnalysisFeature() {
 
   function applySelectedVideo(file: File) {
     setSelectedVideo(file);
+    setVideoId(null);
+    setAnalysisId(null);
     setSourceUrl(URL.createObjectURL(file));
     setResultUrl(null);
     setAnalysis(null);
@@ -359,6 +412,7 @@ export default function VideoAnalysisFeature() {
     setFailedStep(null);
     setViewedStep(1);
     setRequestState("idle");
+    setSaveState("idle");
   }
 
   function cancelPendingVideo() {
@@ -395,10 +449,10 @@ export default function VideoAnalysisFeature() {
     setErrorMessage("");
     setFailedStep(null);
     try {
-      const response = await analyzeVideoRequest(selectedVideo);
-      if (!response.ok) throw new Error(await getErrorMessage(response));
-      const nextAnalysis = (await response.json()) as Analysis;
-      setAnalysis(nextAnalysis);
+      const session = await analyzeVideoRequest(selectedVideo, videoId ?? undefined);
+      setVideoId(session.videoId);
+      setAnalysisId(session.analysisId);
+      setAnalysis(session.data);
       setCorrections({});
       setSlowMotionSegments([]);
       setSlowMotionDraft(null);
@@ -406,6 +460,7 @@ export default function VideoAnalysisFeature() {
       setIsSlowMotionMode(false);
       setCurrentFrame(0);
       setRequestState("editing");
+      setSaveState("saved");
       setViewedStep(2);
       showToast({ type: "success", message: "Landmarks listos para revisar.", autoCloseMs: 3500 });
     } catch (error) {
@@ -424,7 +479,7 @@ export default function VideoAnalysisFeature() {
   function requestReanalysis() {
     showToast({
       type: "warning",
-      message: "Reanalizar reemplazara los landmarks actuales y eliminara todos los marcadores ajustados manualmente.",
+      message: "Reanalizar creara una nueva entrada en el historial y conservara este analisis.",
       actions: [
         { label: "Cancelar", tone: "secondary", onClick: closeToast },
         {
@@ -676,20 +731,18 @@ export default function VideoAnalysisFeature() {
   }
 
   async function exportVideo() {
-    if (!selectedVideo || !analysis || requestState === "exporting") return;
+    if (!analysisId || !analysis || requestState === "exporting") return;
     setRequestState("exporting");
     setErrorMessage("");
     setFailedStep(null);
     setViewedStep(3);
     try {
-      const response = await renderVideoRequest({
-        video: selectedVideo,
-        analysis,
+      const result = await renderVideoRequest({
+        analysisId,
         corrections: Object.values(corrections),
         slowMotionSegments,
       });
-      if (!response.ok) throw new Error(await getErrorMessage(response));
-      setResultUrl(URL.createObjectURL(await response.blob()));
+      setResultUrl(URL.createObjectURL(result));
       setRequestState("complete");
       showToast({ type: "success", message: "El MP4 corregido esta listo.", autoCloseMs: 4000 });
     } catch (error) {
@@ -809,7 +862,7 @@ export default function VideoAnalysisFeature() {
           </section>
 
           <section className="workflow-panel editor-view" aria-label="Editor de landmarks">
-            <div className="editor-panel-heading"><span className="panel-index">02 / EDITOR</span><p>Pausa y arrastra un punto.</p></div>
+            <div className="editor-panel-heading"><span className="panel-index">02 / EDITOR</span><p>Pausa y arrastra un punto. <span className={`save-state save-${saveState}`}>{saveState === "saving" ? "Guardando..." : saveState === "saved" ? "Guardado" : saveState === "error" ? "Error al guardar" : ""}</span></p></div>
             {sourceUrl ? (
               <div ref={workspaceRef} className="editor-workspace">
                 <div ref={stageRef} className="video-stage" style={stageSize ? { width: `${stageSize.width}px`, height: `${stageSize.height}px` } : undefined}>
