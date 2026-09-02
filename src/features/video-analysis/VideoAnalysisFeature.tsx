@@ -785,7 +785,7 @@ export default function VideoAnalysisFeature({ initialVideoId, initialAnalysisId
 
   return (
     <main className="page-shell">
-      <header className="masthead">
+      <header className="workflow-toolbar">
         <a className="brand" href="/" aria-label="Motion Analysis, inicio">
           <span className="brand-mark" aria-hidden="true">MA</span>
           Motion Analysis

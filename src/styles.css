@@ -10,6 +10,7 @@
   --acid: #c8f45b;
   --line: rgba(20, 34, 38, 0.2);
   --masthead-height: 56px;
+  --workflow-toolbar-height: 42px;
 }
 
 * {
@@ -27,12 +28,14 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
 button:focus-visible,
 input:focus-visible,
+textarea:focus-visible,
 a:focus-visible,
 video:focus-visible {
   outline: 3px solid var(--signal);
@@ -58,6 +61,21 @@ video:focus-visible {
   background: var(--paper);
 }
 
+.workflow-toolbar {
+  position: relative;
+  display: flex;
+  height: var(--workflow-toolbar-height);
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--line);
+  background: rgba(240, 238, 229, 0.8);
+}
+
+.workflow-toolbar .brand,
+.workflow-toolbar .version {
+  display: none;
+}
+
 .workflow-stepper {
   position: absolute;
   left: 50%;
@@ -66,7 +84,7 @@ video:focus-visible {
 }
 
 .workflow-viewport {
-  height: calc(100dvh - var(--masthead-height));
+  height: calc(100dvh - var(--masthead-height) - var(--workflow-toolbar-height));
   overflow: hidden;
 }
 
@@ -1071,9 +1089,9 @@ footer {
   }
 
   .workflow-stepper {
-    left: auto;
-    right: 3.6rem;
-    transform: none;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
   }
 
   .workflow-panel {
@@ -1603,6 +1621,277 @@ footer {
   background: var(--ink);
   font-size: 0.68rem;
   font-weight: 700;
+}
+
+.navbar-user-actions,
+.navbar-profile-link {
+  display: flex;
+  align-items: center;
+}
+
+.navbar-user-actions {
+  gap: 0.45rem;
+}
+
+.navbar-profile-link {
+  gap: 0.45rem;
+  max-width: 240px;
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-decoration: none;
+}
+
+.navbar-profile-link > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navbar-profile-link:hover {
+  color: var(--signal);
+}
+
+.navbar-logout {
+  padding: 0.35rem 0.48rem;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.navbar-logout:hover {
+  background: var(--acid);
+}
+
+.profile-shell {
+  width: min(100%, 980px);
+  min-height: calc(100vh - var(--masthead-height));
+  margin: 0 auto;
+  padding: clamp(2rem, 6vw, 5rem) 4vw 4rem;
+}
+
+.profile-heading {
+  display: flex;
+  gap: 2rem;
+  align-items: end;
+  justify-content: space-between;
+  margin-bottom: clamp(2rem, 5vw, 4rem);
+}
+
+.profile-heading h1 {
+  margin: 0.25rem 0 0.5rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(3rem, 7vw, 5.8rem);
+  font-weight: 400;
+  letter-spacing: -0.06em;
+}
+
+.profile-heading p:last-child,
+.profile-muted,
+.profile-save-row p {
+  margin: 0;
+  color: rgba(20, 34, 38, 0.7);
+  line-height: 1.45;
+}
+
+.profile-back-link {
+  flex: 0 0 auto;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.profile-back-link:hover {
+  background: var(--acid);
+}
+
+.profile-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(230px, 0.65fr);
+  gap: 2rem 3rem;
+  padding: clamp(1.2rem, 4vw, 2.4rem);
+  border: 1px solid var(--ink);
+  background: rgba(240, 238, 229, 0.9);
+  box-shadow: 8px 8px 0 var(--ink);
+}
+
+.profile-avatar-section {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: 1rem;
+  align-items: center;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.profile-avatar {
+  width: 82px;
+  height: 82px;
+  flex: 0 0 auto;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  background: white;
+  object-fit: cover;
+}
+
+.profile-initials {
+  display: grid;
+  place-items: center;
+  color: var(--paper);
+  background: var(--ink);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.profile-avatar-section h2,
+.profile-form h2,
+.profile-account-data h2 {
+  margin: 0.25rem 0 0.45rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.5rem;
+  font-weight: 400;
+}
+
+.profile-muted {
+  max-width: 560px;
+  font-size: 0.78rem;
+}
+
+.profile-avatar-actions {
+  display: flex;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+.profile-avatar-actions button,
+.profile-avatar-actions label {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.38rem 0.5rem;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.66rem;
+}
+
+.profile-avatar-actions input {
+  display: none;
+}
+
+.profile-avatar-actions button:hover,
+.profile-avatar-actions label:hover {
+  background: var(--acid);
+}
+
+.profile-form {
+  display: grid;
+  gap: 0.65rem;
+  align-content: start;
+}
+
+.profile-form label {
+  display: grid;
+  gap: 0.32rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.profile-form input,
+.profile-form textarea {
+  width: 100%;
+  padding: 0.62rem;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.7);
+  resize: vertical;
+}
+
+.profile-character-count {
+  margin: -0.3rem 0 0;
+  color: rgba(20, 34, 38, 0.58);
+  font-family: "Lucida Console", "Courier New", monospace;
+  font-size: 0.62rem;
+  text-align: right;
+}
+
+.profile-save-row {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.45rem;
+}
+
+.profile-save-row .analyze-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.profile-save-row p {
+  font-size: 0.71rem;
+}
+
+.profile-account-data {
+  padding-left: 2rem;
+  border-left: 1px solid var(--line);
+}
+
+.profile-account-data dl {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0;
+}
+
+.profile-account-data dl div {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.profile-account-data dt {
+  color: rgba(20, 34, 38, 0.58);
+  font-family: "Lucida Console", "Courier New", monospace;
+  font-size: 0.61rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.profile-account-data dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+@media (max-width: 680px) {
+  .navbar-profile-link > span:last-child {
+    display: none;
+  }
+
+  .profile-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .profile-card {
+    grid-template-columns: 1fr;
+    gap: 1.6rem;
+    box-shadow: 6px 6px 0 var(--ink);
+  }
+
+  .profile-account-data {
+    padding-top: 1.5rem;
+    padding-left: 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
 }
 
 .library-user button,
