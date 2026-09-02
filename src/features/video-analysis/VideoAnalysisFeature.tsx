@@ -1,4 +1,5 @@
 import { FormEvent, PointerEvent, useEffect, useRef, useState } from "react";
+import { CloudUploadOutlined, DownloadOutlined, FullscreenOutlined, RestartAltOutlined } from "@mui/icons-material";
 import { Toast, ToastAction, ToastType } from "../../shared/ui/Toast";
 import {
   analyzeVideo as analyzeVideoRequest,
@@ -836,7 +837,7 @@ export default function VideoAnalysisFeature({ initialVideoId, initialAnalysisId
               <span className="panel-index">01 / ANALISIS</span>
               <input ref={inputRef} className="visually-hidden" id="pitch-video" type="file" accept="video/mp4,video/quicktime,video/x-msvideo,video/webm,.mkv" onChange={(event) => selectVideo(event.target.files?.[0] ?? null)} />
               <button className="file-picker" type="button" onClick={() => { if (inputRef.current) inputRef.current.value = ""; inputRef.current?.click(); }} disabled={isBusy}>
-                <span className="picker-symbol" aria-hidden="true">+</span>
+                <CloudUploadOutlined className="picker-symbol" aria-hidden="true" />
                 <span><strong>{selectedVideo ? "Cambiar video" : "Seleccionar video"}</strong><small>MP4, MOV, AVI, MKV o WebM</small></span>
               </button>
               {selectedVideo && (
@@ -933,9 +934,9 @@ export default function VideoAnalysisFeature({ initialVideoId, initialAnalysisId
                       <div className="compact-actions">
                         <span className="correction-status">{selectedLandmark === null ? "Selecciona un punto" : LANDMARK_NAMES[selectedLandmark]} · {Object.keys(corrections).length} keys</span>
                         <button type="button" title="Deshacer punto" onClick={undoCurrentCorrection} disabled={!selectedCorrection}>&#8630;</button>
-                        <button type="button" title="Resetear ajustes" onClick={() => setCorrections({})} disabled={Object.keys(corrections).length === 0}>&#8635;</button>
-                        <button type="button" title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"} aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"} onClick={toggleFullscreen}>{isFullscreen ? "X" : "\u26F6"}</button>
-                        <button className="export-button" type="button" onClick={exportVideo} disabled={isBusy}>&#8595; MP4</button>
+                        <button type="button" title="Resetear ajustes" onClick={() => setCorrections({})} disabled={Object.keys(corrections).length === 0}><RestartAltOutlined fontSize="small" /></button>
+                        <button type="button" title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"} aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"} onClick={toggleFullscreen}>{isFullscreen ? "X" : <FullscreenOutlined fontSize="small" />}</button>
+                        <button className="export-button" type="button" onClick={exportVideo} disabled={isBusy}><DownloadOutlined fontSize="small" /> MP4</button>
                       </div>
                     </div>
                   )}
