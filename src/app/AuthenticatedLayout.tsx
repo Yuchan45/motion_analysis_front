@@ -1,9 +1,10 @@
 // @ts-nocheck
-import { AccountCircleOutlined, LogoutOutlined } from "@mui/icons-material";
+import { LogoutOutlined } from "@mui/icons-material";
 import { AppBar, Avatar, Box, Button, IconButton, Stack, Toolbar, Tooltip, Typography } from "@mui/material";
 import { Link as RouterLink, Outlet } from "react-router-dom";
 import { useAuth } from "../features/auth/AuthProvider";
 import { apiAssetUrl } from "../shared/api/apiClient";
+import hawkLogo from "../assets/brand/hawk_white.png";
 
 export function AuthenticatedLayout() {
   const { user, logout } = useAuth();
@@ -13,14 +14,13 @@ export function AuthenticatedLayout() {
 
   return <div className="authenticated-shell">
     <AppBar component="header" position="sticky" color="inherit" elevation={0} className="app-navbar">
-      <Toolbar sx={{ minHeight: { xs: 64, sm: 72 }, px: { xs: 2, sm: 4 }, gap: 2 }}>
-        <Stack component={RouterLink} to="/" direction="row" alignItems="center" gap={1.25} color="inherit" sx={{ textDecoration: "none", mr: "auto" }} aria-label="Motion Analysis, inicio">
-          <Box className="brand-mark" aria-hidden="true">MA</Box><Typography fontWeight={800} letterSpacing="-0.03em">Motion Analysis</Typography>
+      <Toolbar className="navbar-toolbar">
+        <Stack component={RouterLink} to="/" className="navbar-brand" direction="row" alignItems="center" color="inherit" aria-label="Motion Analysis, inicio">
+          <Box className="navbar-brand-mark" aria-hidden="true"><img src={hawkLogo} alt="" /></Box><Box className="navbar-brand-copy"><Typography className="navbar-brand-title">Motion Analysis</Typography><Typography className="navbar-brand-kicker">Performance lab</Typography></Box>
         </Stack>
-        <Stack direction="row" alignItems="center" gap={0.5}>
-          <Tooltip title="Mi perfil"><IconButton component={RouterLink} to="/profile" color="primary" aria-label="Abrir mi perfil"><Avatar src={avatar?.url ? apiAssetUrl(avatar.url) : undefined} sx={{ width: 32, height: 32, bgcolor: "secondary.light", color: "text.primary", fontWeight: 800 }}>{avatar?.url ? null : initial}</Avatar><AccountCircleOutlined sx={{ display: { xs: "none", md: "block" }, ml: 0.5 }} /></IconButton></Tooltip>
-          <Typography variant="body2" fontWeight={700} sx={{ display: { xs: "none", md: "block" }, maxWidth: 170, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayName}</Typography>
-          <Tooltip title="Cerrar sesión"><Button color="inherit" size="small" startIcon={<LogoutOutlined />} onClick={() => void logout()} sx={{ display: { xs: "none", sm: "inline-flex" } }}>Salir</Button><IconButton color="inherit" onClick={() => void logout()} sx={{ display: { sm: "none" } }} aria-label="Cerrar sesión"><LogoutOutlined /></IconButton></Tooltip>
+        <Stack className="navbar-actions" direction="row" alignItems="center">
+          <Button className="navbar-profile-button" component={RouterLink} to="/profile" color="inherit" startIcon={<Avatar src={avatar?.url ? apiAssetUrl(avatar.url) : undefined} sx={{ width: 30, height: 30, bgcolor: "secondary.light", color: "text.primary", fontSize: "0.75rem", fontWeight: 800 }}>{avatar?.url ? null : initial}</Avatar>} aria-label="Abrir mi perfil"><span className="navbar-profile-name">{displayName}</span></Button>
+          <Tooltip title="Cerrar sesión"><IconButton className="navbar-logout-button" color="inherit" onClick={() => void logout()} aria-label="Cerrar sesión"><LogoutOutlined fontSize="small" /></IconButton></Tooltip>
         </Stack>
       </Toolbar>
     </AppBar>

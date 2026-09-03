@@ -1,6 +1,7 @@
 import { FormEvent, PointerEvent, useEffect, useRef, useState } from "react";
 import { CloudUploadOutlined, DownloadOutlined, FullscreenOutlined, RestartAltOutlined } from "@mui/icons-material";
 import { Toast, ToastAction, ToastType } from "../../shared/ui/Toast";
+import hawkLogo from "../../assets/brand/hawk_white.png";
 import {
   analyzeVideo as analyzeVideoRequest,
   loadAnalysis as loadAnalysisRequest,
@@ -788,7 +789,7 @@ export default function VideoAnalysisFeature({ initialVideoId, initialAnalysisId
     <main className="page-shell">
       <header className="workflow-toolbar">
         <a className="brand" href="/" aria-label="Motion Analysis, inicio">
-          <span className="brand-mark" aria-hidden="true">MA</span>
+          <span className="brand-mark" aria-hidden="true"><img src={hawkLogo} alt="" /></span>
           Motion Analysis
         </a>
         <nav className="workflow-stepper" aria-label="Progreso del analisis">

@@ -3,7 +3,7 @@ import { AddOutlined, DeleteOutlined as DeleteOutline, EditOutlined, PlayCircleO
 import { Alert, Box, Chip, IconButton, Skeleton, Stack, Tooltip, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
-import { apiRequest } from "../../shared/api/apiClient";
+import { apiBlob, apiRequest } from "../../shared/api/apiClient";
 import { AnalysisResource, VideoResource } from "../../shared/api/contracts";
 import { AppButton } from "../../shared/ui/AppButton";
 import { AppCard } from "../../shared/ui/AppCard";
@@ -11,6 +11,55 @@ import { EmptyState } from "../../shared/ui/EmptyState";
 import { PageHeader } from "../../shared/ui/PageHeader";
 
 type LibraryItem = VideoResource & { analyses: AnalysisResource[] };
+
+function VideoThumbnail({ video }: { video: VideoResource }) {
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    let sourceUrl = "";
+
+    async function createThumbnail() {
+      try {
+        const file = await apiBlob(`/videos/${video.id}/file`);
+        if (!active) return;
+
+        sourceUrl = URL.createObjectURL(file);
+        const media = document.createElement("video");
+        media.muted = true;
+        media.playsInline = true;
+        media.preload = "metadata";
+        media.src = sourceUrl;
+
+        await new Promise<void>((resolve, reject) => {
+          media.addEventListener("loadedmetadata", () => resolve(), { once: true });
+          media.addEventListener("error", () => reject(new Error("No se pudo leer el video.")), { once: true });
+        });
+
+        media.currentTime = Math.min(Math.max(media.duration * 0.1, 0.1), 1);
+        await new Promise<void>((resolve, reject) => {
+          media.addEventListener("seeked", () => resolve(), { once: true });
+          media.addEventListener("error", () => reject(new Error("No se pudo obtener una vista previa.")), { once: true });
+        });
+
+        const maxWidth = 720;
+        const scale = Math.min(1, maxWidth / media.videoWidth);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(media.videoWidth * scale));
+        canvas.height = Math.max(1, Math.round(media.videoHeight * scale));
+        canvas.getContext("2d")?.drawImage(media, 0, 0, canvas.width, canvas.height);
+        if (active) setThumbnailUrl(canvas.toDataURL("image/jpeg", 0.82));
+      } catch {
+        if (active) setThumbnailUrl("");
+      }
+    }
+
+    void createThumbnail();
+    return () => { active = false; if (sourceUrl) URL.revokeObjectURL(sourceUrl); };
+  }, [video.id]);
+
+  return <Box className="video-thumbnail">{thumbnailUrl ? <img src={thumbnailUrl} alt={`Vista previa de ${video.title}`} /> : <PlayCircleOutline aria-hidden="true" />}</Box>;
+}
 
 export function DashboardPage() {
   const [items, setItems] = useState<LibraryItem[]>([]);
@@ -30,5 +79,8 @@ export function DashboardPage() {
 
   return <Box component="main" className="library-shell"><PageHeader eyebrow="Tu biblioteca" title="Videos y análisis." description="Retomá un análisis, revisá su estado o empezá un nuevo video." action={<AppButton component={RouterLink} to="/analysis/new" startIcon={<AddOutlined />}>Subir video</AppButton>} />
     {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
-    {loading ? <Stack gap={2}>{[1, 2, 3].map((item) => <Skeleton key={item} variant="rounded" height={190} />)}</Stack> : items.length === 0 ? <EmptyState title="Tu biblioteca está vacía" description="Subí un video para iniciar tu primer análisis de movimiento." action={<AppButton component={RouterLink} to="/analysis/new" startIcon={<AddOutlined />}>Crear análisis</AppButton>} /> : <Box className="video-grid">{items.map((video) => <AppCard component="article" key={video.id} className="video-card" sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 2 }}><Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1}><Box><Typography variant="caption" color="text.secondary">{new Date(video.createdAt).toLocaleDateString()}</Typography><Typography variant="h5" sx={{ mt: 0.5 }}>{video.title}</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{video.originalFilename} · {(video.sizeBytes / 1024 / 1024).toFixed(1)} MB</Typography></Box><Stack direction="row"><Tooltip title="Renombrar"><IconButton size="small" onClick={() => void rename(video)}><EditOutlined fontSize="small" /></IconButton></Tooltip><Tooltip title="Eliminar"><IconButton size="small" color="error" onClick={() => void remove(video)}><DeleteOutline fontSize="small" /></IconButton></Tooltip></Stack></Stack><AppButton component={RouterLink} to={`/videos/${video.id}/new`} variant="outlined" startIcon={<PlayCircleOutline />}>Nuevo análisis</AppButton><Stack component="ul" gap={0.75} sx={{ listStyle: "none", m: 0, p: 0 }}>{video.analyses.map((analysis) => <Stack component="li" key={analysis.id} direction="row" justifyContent="space-between" alignItems="center" gap={1}><Typography component={RouterLink} to={`/videos/${video.id}/analyses/${analysis.id}`} variant="body2" color="primary" fontWeight={700} sx={{ textDecoration: "none" }}>{analysis.type} {analysis.version}</Typography><Chip size="small" label={analysis.status} color={analysis.status === "COMPLETED" ? "success" : analysis.status === "FAILED" ? "error" : "default"} /></Stack>)}{video.analyses.length === 0 && <Typography component="li" variant="body2" color="text.secondary">Sin análisis todavía.</Typography>}</Stack></AppCard>)}</Box>}</Box>;
+    {loading ? <Stack gap={2}>{[1, 2, 3].map((item) => <Skeleton key={item} variant="rounded" height={190} />)}</Stack> : items.length === 0 ? <EmptyState title="Tu biblioteca está vacía" description="Subí un video para iniciar tu primer análisis de movimiento." action={<AppButton component={RouterLink} to="/analysis/new" startIcon={<AddOutlined />}>Crear análisis</AppButton>} /> : <Box className="video-grid">{items.map((video) => <AppCard component="article" key={video.id} className="video-card" sx={{ p: 1.25, display: "flex", flexDirection: "column", gap: 1 }}>
+      <VideoThumbnail video={video} />
+      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1}><Box><Typography variant="caption" color="text.secondary">{new Date(video.createdAt).toLocaleDateString()}</Typography><Typography variant="h5" sx={{ mt: 0.5 }}>{video.title}</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{video.originalFilename} · {(video.sizeBytes / 1024 / 1024).toFixed(1)} MB</Typography></Box><Stack direction="row"><Tooltip title="Renombrar"><IconButton size="small" onClick={() => void rename(video)}><EditOutlined fontSize="small" /></IconButton></Tooltip><Tooltip title="Eliminar"><IconButton size="small" color="error" onClick={() => void remove(video)}><DeleteOutline fontSize="small" /></IconButton></Tooltip></Stack></Stack><AppButton component={RouterLink} to={`/videos/${video.id}/new`} variant="outlined" startIcon={<PlayCircleOutline />}>Nuevo análisis</AppButton><Stack component="ul" gap={0.75} sx={{ listStyle: "none", m: 0, p: 0 }}>{video.analyses.map((analysis) => <Stack component="li" key={analysis.id} direction="row" justifyContent="space-between" alignItems="center" gap={1}><Typography component={RouterLink} to={`/videos/${video.id}/analyses/${analysis.id}`} variant="body2" color="primary" fontWeight={700} sx={{ textDecoration: "none" }}>{analysis.type} {analysis.version}</Typography><Chip size="small" label={analysis.status} color={analysis.status === "COMPLETED" ? "success" : analysis.status === "FAILED" ? "error" : "default"} /></Stack>)}{video.analyses.length === 0 && <Typography component="li" variant="body2" color="text.secondary">Sin análisis todavía.</Typography>}</Stack>
+    </AppCard>)}</Box>}</Box>;
 }
